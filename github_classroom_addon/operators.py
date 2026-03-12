@@ -165,18 +165,25 @@ class GITHUB_OT_OpenFile(Operator):
         )
 
         if success:
+            # Save values to local Python variables before open_mainfile,
+            # because it frees the old scene and all Blender properties
+            blend_file_name = repo_item.blend_file_name
+            repo_owner = repo_item.owner
+            repo_name = repo_item.repo_name
+            blend_file_path = repo_item.blend_file_path
+            role = props.role
+
             # Track working file for auto-push (students only)
-            if props.role == 'STUDENT':
+            if role == 'STUDENT':
                 client.set_working_file(
-                    repo_item.owner,
-                    repo_item.repo_name,
-                    repo_item.blend_file_path
+                    repo_owner, repo_name, blend_file_path
                 )
 
             bpy.ops.wm.open_mainfile(filepath=download_path)
             # Note: scene properties reset after open_mainfile,
-            # but client state persists in memory
-            self.report({'INFO'}, f"Opened {repo_item.blend_file_name}")
+            # but client state persists in memory.
+            # Do NOT access props or repo_item after this point.
+            self.report({'INFO'}, f"Opened {blend_file_name}")
         else:
             props.error_message = error
             self.report({'ERROR'}, error)

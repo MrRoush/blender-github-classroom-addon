@@ -161,9 +161,10 @@ class GitHubClassroomClient:
         try:
             all_repos = []
             page = 1
+            encoded_org = urllib.parse.quote(org_name, safe='')
             while True:
                 repos = self._make_request(
-                    f'/orgs/{org_name}/repos?per_page=100&page={page}'
+                    f'/orgs/{encoded_org}/repos?per_page=100&page={page}'
                     f'&sort=updated&direction=desc'
                 )
                 if not repos:
@@ -193,7 +194,9 @@ class GitHubClassroomClient:
 
         try:
             encoded_path = urllib.parse.quote(path, safe='/')
-            endpoint = f'/repos/{owner}/{repo}/contents/{encoded_path}'
+            encoded_owner = urllib.parse.quote(owner, safe='')
+            encoded_repo = urllib.parse.quote(repo, safe='')
+            endpoint = f'/repos/{encoded_owner}/{encoded_repo}/contents/{encoded_path}'
             contents = self._make_request(endpoint)
 
             blend_files = []
@@ -226,7 +229,9 @@ class GitHubClassroomClient:
         try:
             # Get file info to obtain the download URL
             encoded_path = urllib.parse.quote(file_path, safe='/')
-            endpoint = f'/repos/{owner}/{repo}/contents/{encoded_path}'
+            encoded_owner = urllib.parse.quote(owner, safe='')
+            encoded_repo = urllib.parse.quote(repo, safe='')
+            endpoint = f'/repos/{encoded_owner}/{encoded_repo}/contents/{encoded_path}'
             file_info = self._make_request(endpoint)
 
             download_url = file_info.get('download_url')
@@ -271,9 +276,11 @@ class GitHubClassroomClient:
             # Check if file already exists to get its SHA (needed for updates)
             sha = None
             encoded_path = urllib.parse.quote(file_path, safe='/')
+            encoded_owner = urllib.parse.quote(owner, safe='')
+            encoded_repo = urllib.parse.quote(repo, safe='')
             try:
                 existing = self._make_request(
-                    f'/repos/{owner}/{repo}/contents/{encoded_path}'
+                    f'/repos/{encoded_owner}/{encoded_repo}/contents/{encoded_path}'
                 )
                 sha = existing.get('sha')
             except urllib.error.HTTPError:
@@ -294,7 +301,7 @@ class GitHubClassroomClient:
                 data['sha'] = sha
 
             self._make_request(
-                f'/repos/{owner}/{repo}/contents/{encoded_path}',
+                f'/repos/{encoded_owner}/{encoded_repo}/contents/{encoded_path}',
                 method='PUT',
                 data=data
             )
