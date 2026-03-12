@@ -240,8 +240,8 @@ class GitHubClassroomClient:
                 'message': message,
                 'content': content,
                 'committer': {
-                    'name': self.username,
-                    'email': f'{self.username}@users.noreply.github.com',
+                    'name': self.username or 'Blender User',
+                    'email': f'{self.username or "blender"}@users.noreply.github.com',
                 },
             }
             if sha:

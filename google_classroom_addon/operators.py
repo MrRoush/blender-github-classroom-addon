@@ -306,7 +306,7 @@ class GITHUB_OT_Authenticate(Operator):
         props.status_message = "Authenticating with GitHub..."
         props.error_message = ""
 
-        success, message = client.authenticate(token if token else None)
+        success, message = client.authenticate(token or None)
 
         if success:
             props.is_authenticated = True
