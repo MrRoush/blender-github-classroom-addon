@@ -135,11 +135,17 @@ class GitHubClassroomClient:
                     break
                 page += 1
 
-            # Filter to repos in the specified organization
+            # Filter to repos in the specified organization, then to only
+            # repos whose name contains the student's username
+            # (GitHub Classroom names them {assignment}-{username}).
             org_lower = org_name.lower()
+            username_lower = (self.username or '').lower()
+            if not username_lower:
+                return False, [], "Username not available; please re-authenticate"
             filtered = [
                 r for r in all_repos
                 if r.get('owner', {}).get('login', '').lower() == org_lower
+                and username_lower in r.get('name', '').lower()
             ]
 
             return True, filtered, ""
@@ -182,6 +188,38 @@ class GitHubClassroomClient:
             return False, [], f"API error: HTTP {e.code}"
         except Exception as e:
             return False, [], f"Error fetching org repos: {str(e)}"
+
+    def is_org_admin(self, org_name: str) -> Tuple[bool, str]:
+        """
+        Check if the authenticated user is an admin/owner of the organization.
+        Returns: (is_admin, error_message)
+        """
+        if not self.is_authenticated():
+            return False, "Not authenticated"
+
+        try:
+            encoded_org = urllib.parse.quote(org_name, safe='')
+            encoded_username = urllib.parse.quote(self.username, safe='')
+            membership = self._make_request(
+                f'/orgs/{encoded_org}/memberships/{encoded_username}'
+            )
+            role = membership.get('role', '')
+            if role == 'admin':
+                return True, ""
+            return False, (
+                "Teacher access requires organization admin/owner privileges. "
+                "Your account does not have admin access to this organization."
+            )
+
+        except urllib.error.HTTPError as e:
+            if e.code in (403, 404):
+                return False, (
+                    "Teacher access requires organization admin/owner privileges. "
+                    "Your account does not have admin access to this organization."
+                )
+            return False, f"Error checking organization membership: HTTP {e.code}"
+        except Exception as e:
+            return False, f"Error checking organization membership: {str(e)}"
 
     def find_blend_files(self, owner: str, repo: str,
                          path: str = '') -> Tuple[bool, List[Dict[str, Any]], str]:
