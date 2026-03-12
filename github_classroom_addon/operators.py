@@ -87,6 +87,11 @@ class GITHUB_OT_RefreshRepos(Operator):
 
         # Teachers see all org repos, students see only their own
         if props.role == 'TEACHER':
+            is_admin, admin_error = client.is_org_admin(props.github_org)
+            if not is_admin:
+                props.error_message = admin_error
+                self.report({'ERROR'}, admin_error)
+                return {'CANCELLED'}
             success, repos, error = client.get_org_repos(props.github_org)
         else:
             success, repos, error = client.get_repos(props.github_org)
