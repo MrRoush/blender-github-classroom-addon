@@ -7,6 +7,7 @@ Uses only Python standard library (no external dependencies required).
 import os
 import json
 import base64
+import urllib.parse
 import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any, Tuple
@@ -191,7 +192,8 @@ class GitHubClassroomClient:
             return False, [], "Not authenticated"
 
         try:
-            endpoint = f'/repos/{owner}/{repo}/contents/{path}'
+            encoded_path = urllib.parse.quote(path, safe='/')
+            endpoint = f'/repos/{owner}/{repo}/contents/{encoded_path}'
             contents = self._make_request(endpoint)
 
             blend_files = []
@@ -223,7 +225,8 @@ class GitHubClassroomClient:
 
         try:
             # Get file info to obtain the download URL
-            endpoint = f'/repos/{owner}/{repo}/contents/{file_path}'
+            encoded_path = urllib.parse.quote(file_path, safe='/')
+            endpoint = f'/repos/{owner}/{repo}/contents/{encoded_path}'
             file_info = self._make_request(endpoint)
 
             download_url = file_info.get('download_url')
@@ -267,9 +270,10 @@ class GitHubClassroomClient:
 
             # Check if file already exists to get its SHA (needed for updates)
             sha = None
+            encoded_path = urllib.parse.quote(file_path, safe='/')
             try:
                 existing = self._make_request(
-                    f'/repos/{owner}/{repo}/contents/{file_path}'
+                    f'/repos/{owner}/{repo}/contents/{encoded_path}'
                 )
                 sha = existing.get('sha')
             except urllib.error.HTTPError:
@@ -290,7 +294,7 @@ class GitHubClassroomClient:
                 data['sha'] = sha
 
             self._make_request(
-                f'/repos/{owner}/{repo}/contents/{file_path}',
+                f'/repos/{owner}/{repo}/contents/{encoded_path}',
                 method='PUT',
                 data=data
             )
