@@ -1,8 +1,8 @@
 # Configuration Directory
 
-This directory stores your OAuth credentials and authentication tokens.
+This directory stores your authentication credentials and tokens.
 
-## Required File
+## Google Classroom Setup
 
 ### credentials.json
 Your OAuth 2.0 client credentials from Google Cloud Console.
@@ -17,22 +17,34 @@ Your OAuth 2.0 client credentials from Google Cloud Console.
 
 **Template:** See `credentials.json.template` for the expected format.
 
-## Generated Files
-
 ### token.pickle
-Automatically created after first successful authentication. Contains your access and refresh tokens.
+Automatically created after first successful Google authentication. Contains your access and refresh tokens.
 
-**Do not share this file** - it provides access to your Google account.
+## GitHub Classroom Setup
 
-**To re-authenticate:** Delete this file and sign in again in Blender.
+GitHub Classroom **does not** require Google Cloud Console access.
+
+### github_token.json
+Automatically created after first successful GitHub authentication. Contains your Personal Access Token.
+
+**How to create a GitHub Personal Access Token:**
+1. Go to [GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)](https://github.com/settings/tokens)
+2. Click **Generate new token (classic)**
+3. Give it a descriptive name (e.g., "Blender Classroom Add-on")
+4. Select the **repo** scope (Full control of private repositories)
+5. Click **Generate token**
+6. Copy the token and paste it into the add-on's Token field in Blender
+
+**Note:** The token is entered in Blender's sidebar panel and saved automatically.
 
 ## Security Notes
 
-- **Never commit credentials.json or token.pickle to version control**
+- **Never commit credentials.json, token.pickle, or github_token.json to version control**
 - These files are listed in .gitignore
 - Keep credentials.json secure but it can be shared with your class
-- Each user's token.pickle is unique to their Google account
-- Students can revoke access anytime via Google Account settings
+- Each user's token.pickle / github_token.json is unique to their account
+- Students can revoke GitHub token access anytime via GitHub Settings
+- Students can revoke Google access anytime via Google Account settings
 
 ## File Locations
 

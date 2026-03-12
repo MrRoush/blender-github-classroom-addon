@@ -1,6 +1,7 @@
 # Credentials and tokens
 google_classroom_addon/config/credentials.json
 google_classroom_addon/config/token.pickle
+google_classroom_addon/config/github_token.json
 
 # Python cache
 __pycache__/

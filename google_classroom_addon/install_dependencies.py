@@ -65,8 +65,12 @@ def install_dependencies(python_path, requirements_file):
 
 def main():
     print("=" * 60)
-    print("Google Classroom Blender Add-on - Dependency Installer")
+    print("Classroom Blender Add-on - Dependency Installer")
     print("=" * 60)
+    print()
+    print("NOTE: If you are using GitHub Classroom, no additional")
+    print("dependencies are needed. This installer is only required")
+    print("for Google Classroom integration.")
     print()
     
     # Find Blender's Python
