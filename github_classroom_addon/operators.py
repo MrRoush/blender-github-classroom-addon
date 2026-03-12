@@ -202,10 +202,11 @@ class GITHUB_OT_PushFile(Operator):
         working = client.get_working_file()
         if not working:
             props.error_message = (
-                "No file connected to GitHub. "
-                "Open a file from your assignment first."
+                "No assignment file loaded. "
+                "Click \"Open Assignment\" first to connect "
+                "to your GitHub repository."
             )
-            self.report({'ERROR'}, "No file connected to GitHub")
+            self.report({'ERROR'}, "No assignment file loaded")
             return {'CANCELLED'}
 
         if not bpy.data.filepath:
@@ -315,6 +316,9 @@ def auto_push_on_save(dummy):
             props.status_message = "Auto-pushed to GitHub"
             props.error_message = ""
         else:
-            props.error_message = f"Auto-push failed: {error}"
+            props.error_message = (
+                f"Auto-push failed: {error}. "
+                f"Try manual push or check your connection."
+            )
     except Exception:
         pass

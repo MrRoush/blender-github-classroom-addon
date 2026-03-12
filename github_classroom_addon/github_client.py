@@ -276,13 +276,14 @@ class GitHubClassroomClient:
                 pass
 
             # Create or update the file
+            committer_name = self.username or 'Blender User'
+            committer_id = self.username or 'blender'
             data = {
                 'message': message,
                 'content': content,
                 'committer': {
-                    'name': self.username or 'Blender User',
-                    'email': (f'{self.username or "blender"}'
-                              f'@users.noreply.github.com'),
+                    'name': committer_name,
+                    'email': f'{committer_id}@users.noreply.github.com',
                 },
             }
             if sha:
