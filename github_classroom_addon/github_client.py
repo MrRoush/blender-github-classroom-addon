@@ -443,15 +443,18 @@ class GitHubClassroomClient:
         url = url.strip().rstrip('/')
         if url.endswith('.git'):
             url = url[:-4]
-        if url.startswith('https://'):
-            url = url[8:]
-        elif url.startswith('http://'):
-            url = url[7:]
-        if url.startswith('github.com/'):
-            url = url[11:]
-        parts = url.split('/')
-        if len(parts) >= 2 and parts[0] and parts[1]:
-            return parts[0], parts[1]
+
+        # Use proper URL parsing to avoid substring matching issues
+        if '://' not in url:
+            url = 'https://' + url
+        parsed = urllib.parse.urlparse(url)
+        if parsed.hostname != 'github.com':
+            return None, None
+
+        # Extract path components (e.g. /owner/repo/...)
+        path_parts = [p for p in parsed.path.split('/') if p]
+        if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+            return path_parts[0], path_parts[1]
         return None, None
 
     # --- Assignment grouping (for teacher view) ---
