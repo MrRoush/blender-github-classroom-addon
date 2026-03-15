@@ -6,14 +6,21 @@ A Blender 4.5 LTS add-on that integrates **GitHub Classroom** directly into Blen
 
 This add-on is designed for animation and 3D art courses that use Blender. It connects to **GitHub Classroom** using a simple Personal Access Token — no complex setup or cloud admin access required.
 
+The add-on features a **Simple/Advanced mode** toggle:
+- **Simple mode** (default): A clean, student-focused interface with auto-push on save
+- **Advanced mode**: Additional options for power users — role switching, custom commit messages, auto-push mode selection, and manual repository URL entry
+
 ### For Students
 - 📥 **Pull** your assignment .blend file from your GitHub Classroom repository
 - 🎨 Work on your project in Blender as usual
 - 📤 **Auto-push** your changes to GitHub every time you save (or push manually)
+- ✏️ **Custom commit messages** (advanced mode) — describe your changes
+- 🔗 **Pull from URL** (advanced mode) — open any repo by pasting its GitHub URL
 - No programming knowledge required — just enter your token and go!
 
 ### For Teachers
 - 📂 **Browse** all student repositories in your GitHub Classroom organization
+- 📁 **Assignment grouping** — repos sorted by assignment name with collapsible folders
 - 📥 **Pull** any student's .blend file to review their progress
 - Grade work by opening student files directly in Blender
 - Monitor student progress throughout projects
@@ -24,21 +31,21 @@ This add-on is designed for animation and 3D art courses that use Blender. It co
 
 1. Install the add-on in Blender (Edit → Preferences → Add-ons → Install)
 2. Open the **Classroom** sidebar panel (press N in the 3D Viewport → Classroom tab)
-3. Select **Student** as your role
-4. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with the **repo** scope
-5. Enter your token and click **Sign In**
-6. Enter your classroom organization name and click **Load My Assignments**
-7. Select a repository and click **Open Assignment** to download and open your .blend file
-8. Work on your project — your changes are **automatically pushed to GitHub when you save**!
+3. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with the **repo** scope
+4. Enter your token and click **Sign In**
+5. Enter your classroom organization name and click **Load My Assignments**
+6. Select a repository and click **Open Assignment** to download and open your .blend file
+7. Work on your project — your changes are **automatically pushed to GitHub when you save**!
 
 ### Teachers
 
 1. Install the add-on in Blender (Edit → Preferences → Add-ons → Install)
 2. Open the **Classroom** sidebar panel (press N in the 3D Viewport → Classroom tab)
-3. Select **Teacher** as your role
+3. Enable **Show Advanced Options** and select **Teacher** as your role
 4. Sign in with your GitHub Personal Access Token
 5. Enter your classroom organization name and click **Load Student Repos**
-6. Select a student's repository and click **Open for Review**
+6. Expand an assignment folder and select a student's repository
+7. Click **Open for Review** to download and open the student's .blend file
 
 ## Requirements
 
@@ -70,10 +77,22 @@ github_classroom_addon/
 ## How It Works
 
 1. **Authentication**: Students and teachers sign in with a GitHub Personal Access Token
-2. **Repository Listing**: Students see their own assignment repos; teachers see all repos in the organization
+2. **Repository Listing**: Students see their own assignment repos; teachers see all repos in the organization grouped by assignment
 3. **File Operations**: .blend files are downloaded from GitHub and opened in Blender
-4. **Auto-Push**: When students save their work (Ctrl+S), changes are automatically pushed back to their GitHub repository
+4. **Auto-Push**: When students save their work (Ctrl+S), changes are automatically pushed back to their GitHub repository (default behavior; can be changed to manual or on-quit in advanced mode)
 5. **Teacher Review**: Teachers can pull any student's file to review progress and grade work
+
+## Advanced Mode
+
+Enable **Show Advanced Options** to access additional features:
+
+| Feature | Description |
+|---------|-------------|
+| **Role Selector** | Switch between Student and Teacher modes |
+| **Commit Message** | Write a custom message describing your changes |
+| **Auto-Push Mode** | Choose: On Save (default), Manual, or On Quit |
+| **Repository URL** | Enter a GitHub repo URL to pull from directly |
+| **Pull from URL** | Download a .blend file from any GitHub repository |
 
 ## Contributing
 

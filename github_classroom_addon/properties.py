@@ -25,12 +25,17 @@ class GitHubRepoItem(PropertyGroup):
     blend_file_name: StringProperty(name="Blend File Name")
     updated_at: StringProperty(name="Last Updated")
     submitted: BoolProperty(name="Submitted", default=False)
+    assignment_name: StringProperty(
+        name="Assignment Name",
+        description="Assignment group name derived from repo naming convention",
+        default=""
+    )
 
 
 class GitHubClassroomProperties(PropertyGroup):
     """Main property group for GitHub Classroom integration"""
 
-    # Role selection
+    # Role selection (visible in advanced mode)
     role: EnumProperty(
         name="Role",
         description="Select your role",
@@ -78,6 +83,20 @@ class GitHubClassroomProperties(PropertyGroup):
         name="Show Repos",
         description="Show GitHub repos list",
         default=False
+    )
+
+    # Commit message (advanced mode)
+    commit_message: StringProperty(
+        name="Commit Message",
+        description="Optional commit message (auto-generates if left blank)",
+        default=""
+    )
+
+    # Repository URL (advanced mode, for manual pull)
+    repo_url: StringProperty(
+        name="Repository URL",
+        description="GitHub repository URL for manual pull",
+        default=""
     )
 
     # Status messages

@@ -1,6 +1,8 @@
 """
 UI panel classes for GitHub Classroom Blender add-on
-Simplified interface for students (non-programmers) and teachers
+Simplified interface for students (non-programmers) and teachers.
+Simple mode hides advanced options; Advanced mode shows role selection,
+commit messages, auto-push settings, and manual repo URL entry.
 """
 
 import bpy
@@ -37,12 +39,22 @@ class GITHUB_PT_MainPanel(Panel):
         layout = self.layout
         props = context.scene.github_classroom
         client = get_github_client()
+        advanced = client.advanced_mode
 
-        # Role selector
-        box = layout.box()
-        box.label(text="I am a:", icon='USER')
-        row = box.row(align=True)
-        row.prop(props, "role", expand=True)
+        # Advanced mode toggle
+        row = layout.row()
+        icon = 'CHECKBOX_HLT' if advanced else 'CHECKBOX_DEHLT'
+        row.operator(
+            "github_class.toggle_advanced_mode",
+            text="Show Advanced Options", icon=icon
+        )
+
+        # Role selector (advanced mode only)
+        if advanced:
+            box = layout.box()
+            box.label(text="I am a:", icon='USER')
+            row = box.row(align=True)
+            row.prop(props, "role", expand=True)
 
         # Authentication
         box = layout.box()
@@ -73,8 +85,18 @@ class GITHUB_PT_MainPanel(Panel):
                     text="Load My Assignments", icon='FILE_REFRESH'
                 )
 
-        # Working file status (for students with auto-push)
-        if props.role == 'STUDENT' and client.is_authenticated():
+        # Repository URL (advanced mode only)
+        if advanced and client.is_authenticated():
+            box = layout.box()
+            box.label(text="Repository URL", icon='URL')
+            box.prop(props, "repo_url", text="URL")
+            box.operator(
+                "github_class.pull_from_url",
+                text="Pull from URL", icon='IMPORT'
+            )
+
+        # Working file status
+        if client.is_authenticated():
             working = client.get_working_file()
             if working:
                 box = layout.box()
@@ -82,16 +104,24 @@ class GITHUB_PT_MainPanel(Panel):
                 box.label(text=f"Repo: {working['repo_name']}")
                 box.label(text=f"File: {working['file_path']}")
 
-                # Auto-push toggle
-                row = box.row()
-                if client.auto_push:
-                    icon = 'CHECKBOX_HLT'
-                else:
-                    icon = 'CHECKBOX_DEHLT'
-                row.operator(
-                    "github_class.toggle_auto_push",
-                    text="Auto-Push on Save", icon=icon
-                )
+                # Commit message (advanced mode only)
+                if advanced:
+                    box.label(text="Commit Message:", icon='TEXT')
+                    box.prop(props, "commit_message", text="")
+
+                # Auto-push mode (advanced mode only)
+                if advanced:
+                    row = box.row(align=True)
+                    row.label(text="Auto-Push:")
+                    for mode, label in [('ON_SAVE', "On Save"),
+                                        ('MANUAL', "Manual"),
+                                        ('ON_QUIT', "On Quit")]:
+                        op = row.operator(
+                            "github_class.set_auto_push_mode",
+                            text=label,
+                            depress=(client.auto_push_mode == mode)
+                        )
+                        op.mode = mode
 
                 # Manual push button
                 box.operator("github_class.push_file", icon='EXPORT')
@@ -129,6 +159,7 @@ class GITHUB_PT_ReposPanel(Panel):
     def draw(self, context):
         layout = self.layout
         props = context.scene.github_classroom
+        client = get_github_client()
 
         if len(props.github_repos) == 0:
             layout.label(text="No repositories found", icon='INFO')
@@ -144,63 +175,138 @@ class GITHUB_PT_ReposPanel(Panel):
                 text=f"{count} assignments", icon='FILE_FOLDER'
             )
 
+        # Teacher mode: group repos by assignment name
+        if props.role == 'TEACHER':
+            self._draw_teacher_repos(layout, props, client)
+        else:
+            self._draw_student_repos(layout, props)
+
+    def _draw_student_repos(self, layout, props):
+        """Draw a flat list of student repos"""
         for i, repo in enumerate(props.github_repos):
             box = layout.box()
+            self._draw_repo_item(box, props, repo, i)
 
-            # Repo name as selection button
-            row = box.row()
-            if i == props.active_repo_index:
-                icon = 'RADIOBUT_ON'
-            else:
-                icon = 'RADIOBUT_OFF'
+    def _draw_teacher_repos(self, layout, props, client):
+        """Draw repos grouped by assignment (teacher view)"""
+        # Build ordered list of assignment groups
+        assignment_order = []
+        assignment_repos = {}
+        seen = set()
+
+        for i, repo in enumerate(props.github_repos):
+            name = repo.assignment_name
+            if name and name not in seen:
+                seen.add(name)
+                assignment_order.append(name)
+            if name not in assignment_repos:
+                assignment_repos[name] = []
+            assignment_repos[name].append((i, repo))
+
+        # Render grouped assignments first
+        for assignment in assignment_order:
+            repos = assignment_repos[assignment]
+            is_expanded = assignment in client.expanded_assignments
+
+            # Assignment group header
+            header_box = layout.box()
+            row = header_box.row()
+            icon = 'TRIA_DOWN' if is_expanded else 'TRIA_RIGHT'
             op = row.operator(
-                "github_class.select_repo",
-                text=repo.repo_name, icon=icon, emboss=False
+                "github_class.toggle_assignment",
+                text=f"{assignment} ({len(repos)})",
+                icon=icon, emboss=False
             )
-            op.repo_index = i
+            op.assignment_name = assignment
 
-            # Show details if selected
-            if i == props.active_repo_index:
-                if repo.description:
-                    box.label(text=repo.description, icon='TEXT')
+            # Expanded: show repos inside
+            if is_expanded:
+                for idx, repo in repos:
+                    # Show student name (repo name minus assignment prefix)
+                    student_label = repo.repo_name
+                    if repo.repo_name.startswith(assignment + '-'):
+                        student_label = repo.repo_name[len(assignment) + 1:]
 
-                if repo.updated_at:
-                    box.label(
-                        text=f"Updated: {repo.updated_at}", icon='TIME'
-                    )
-
-                # .blend file indicator
-                if repo.has_blend_file:
-                    box.label(
-                        text=f"File: {repo.blend_file_name}",
-                        icon='FILE_BLEND'
-                    )
-                    row = box.row()
-                    if props.role == 'TEACHER':
-                        row.operator(
-                            "github_class.open_file",
-                            text="Open for Review", icon='FILEBROWSER'
-                        )
+                    inner_box = header_box.box()
+                    row = inner_box.row()
+                    if idx == props.active_repo_index:
+                        sel_icon = 'RADIOBUT_ON'
                     else:
-                        row.operator(
-                            "github_class.open_file",
-                            text="Open Assignment", icon='FILEBROWSER'
-                        )
-                else:
-                    box.label(text="No .blend file found", icon='INFO')
+                        sel_icon = 'RADIOBUT_OFF'
+                    op = row.operator(
+                        "github_class.select_repo",
+                        text=student_label,
+                        icon=sel_icon, emboss=False
+                    )
+                    op.repo_index = idx
 
-                # Push button (students only)
-                if props.role == 'STUDENT':
-                    box.separator()
-                    col = box.column()
-                    if repo.submitted:
-                        col.label(text="Submitted", icon='CHECKMARK')
-                        col.operator(
-                            "github_class.push_file",
-                            text="Resubmit", icon='EXPORT'
-                        )
-                    else:
-                        col.operator(
-                            "github_class.push_file",
-                            text="Save & Push", icon='EXPORT'
-                        )
+                    if idx == props.active_repo_index:
+                        self._draw_repo_details(inner_box, props, repo)
+
+        # Render ungrouped repos (no assignment prefix)
+        ungrouped = assignment_repos.get('', [])
+        for idx, repo in ungrouped:
+            box = layout.box()
+            self._draw_repo_item(box, props, repo, idx)
+
+    def _draw_repo_item(self, box, props, repo, index):
+        """Draw a single repo entry with selection button"""
+        row = box.row()
+        if index == props.active_repo_index:
+            icon = 'RADIOBUT_ON'
+        else:
+            icon = 'RADIOBUT_OFF'
+        op = row.operator(
+            "github_class.select_repo",
+            text=repo.repo_name, icon=icon, emboss=False
+        )
+        op.repo_index = index
+
+        if index == props.active_repo_index:
+            self._draw_repo_details(box, props, repo)
+
+    def _draw_repo_details(self, box, props, repo):
+        """Draw details for a selected repo"""
+        if repo.description:
+            box.label(text=repo.description, icon='TEXT')
+
+        if repo.updated_at:
+            box.label(
+                text=f"Updated: {repo.updated_at}", icon='TIME'
+            )
+
+        # .blend file indicator
+        if repo.has_blend_file:
+            box.label(
+                text=f"File: {repo.blend_file_name}",
+                icon='FILE_BLEND'
+            )
+            row = box.row()
+            if props.role == 'TEACHER':
+                row.operator(
+                    "github_class.open_file",
+                    text="Open for Review", icon='FILEBROWSER'
+                )
+            else:
+                row.operator(
+                    "github_class.open_file",
+                    text="Open Assignment", icon='FILEBROWSER'
+                )
+        else:
+            box.label(text="No .blend file found", icon='INFO')
+
+        # Push button (students only)
+        if props.role == 'STUDENT':
+            box.separator()
+            col = box.column()
+            if repo.submitted:
+                col.label(text="Submitted", icon='CHECKMARK')
+                col.operator(
+                    "github_class.push_file",
+                    text="Resubmit", icon='EXPORT'
+                )
+            else:
+                col.operator(
+                    "github_class.push_file",
+                    text="Save & Push", icon='EXPORT'
+                )
