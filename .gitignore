@@ -1,6 +1,7 @@
 # Credentials and tokens
 github_classroom_addon/config/github_token.json
 github_classroom_addon/config/working_file.json
+github_classroom_addon/config/settings.json
 
 # Python cache
 __pycache__/

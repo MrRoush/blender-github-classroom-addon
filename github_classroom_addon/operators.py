@@ -6,7 +6,7 @@ import bpy
 import os
 import tempfile
 from bpy.types import Operator
-from .github_client import get_github_client
+from .github_client import get_github_client, AUTO_PUSH_ON_SAVE, AUTO_PUSH_ON_QUIT
 
 
 class GITHUB_OT_Authenticate(Operator):
@@ -117,6 +117,13 @@ class GITHUB_OT_RefreshRepos(Operator):
                     item.has_blend_file = True
                     item.blend_file_path = blend_files[0].get('path', '')
                     item.blend_file_name = blend_files[0].get('name', '')
+
+            # Compute assignment grouping for teacher view
+            if props.role == 'TEACHER':
+                repo_names = [r.repo_name for r in props.github_repos]
+                groups = client.compute_assignment_groups(repo_names)
+                for item in props.github_repos:
+                    item.assignment_name = groups.get(item.repo_name, '')
 
             props.show_repos = True
             count = len(repos)
@@ -229,17 +236,23 @@ class GITHUB_OT_PushFile(Operator):
         props.status_message = "Pushing to GitHub..."
         props.error_message = ""
 
+        # Use custom commit message if provided (advanced mode), else auto
         file_name = os.path.basename(bpy.data.filepath)
+        message = props.commit_message.strip()
+        if not message:
+            message = f"Update {file_name} from Blender"
+
         success, error = client.upload_file(
             working['repo_owner'],
             working['repo_name'],
             working['file_path'],
             bpy.data.filepath,
-            message=f"Update {file_name} from Blender"
+            message=message
         )
 
         if success:
             props.status_message = "Pushed to GitHub successfully!"
+            props.commit_message = ""
             self.report({'INFO'}, "Pushed to GitHub successfully!")
         else:
             props.error_message = error
@@ -248,17 +261,125 @@ class GITHUB_OT_PushFile(Operator):
         return {'FINISHED'}
 
 
-class GITHUB_OT_ToggleAutoPush(Operator):
-    """Toggle auto-push on save"""
-    bl_idname = "github_class.toggle_auto_push"
-    bl_label = "Toggle Auto-Push"
-    bl_description = "Toggle whether saving automatically pushes to GitHub"
+class GITHUB_OT_SetAutoPushMode(Operator):
+    """Set the auto-push mode"""
+    bl_idname = "github_class.set_auto_push_mode"
+    bl_label = "Set Auto-Push Mode"
+    bl_description = "Choose when to automatically push to GitHub"
+
+    mode: bpy.props.EnumProperty(
+        items=[
+            ('ON_SAVE', "On Save",
+             "Automatically push when saving the file"),
+            ('MANUAL', "Manual",
+             "Only push when you click the button"),
+            ('ON_QUIT', "On Quit",
+             "Automatically push when closing Blender"),
+        ]
+    )
 
     def execute(self, context):
         client = get_github_client()
-        client.set_auto_push(not client.auto_push)
-        state = "enabled" if client.auto_push else "disabled"
-        self.report({'INFO'}, f"Auto-push {state}")
+        client.set_auto_push_mode(self.mode)
+        labels = {
+            'ON_SAVE': 'On Save',
+            'MANUAL': 'Manual',
+            'ON_QUIT': 'On Quit',
+        }
+        self.report({'INFO'}, f"Auto-push set to: {labels[self.mode]}")
+        return {'FINISHED'}
+
+
+class GITHUB_OT_ToggleAdvancedMode(Operator):
+    """Toggle between Simple and Advanced mode"""
+    bl_idname = "github_class.toggle_advanced_mode"
+    bl_label = "Show Advanced Options"
+    bl_description = (
+        "Toggle advanced options like role selection, "
+        "commit messages, and auto-push settings"
+    )
+
+    def execute(self, context):
+        client = get_github_client()
+        client.advanced_mode = not client.advanced_mode
+        client._save_settings()
+        state = "enabled" if client.advanced_mode else "disabled"
+        self.report({'INFO'}, f"Advanced mode {state}")
+        return {'FINISHED'}
+
+
+class GITHUB_OT_PullFromURL(Operator):
+    """Pull a .blend file from a specific GitHub repository URL"""
+    bl_idname = "github_class.pull_from_url"
+    bl_label = "Pull from URL"
+    bl_description = (
+        "Download and open a .blend file from a GitHub repository URL"
+    )
+
+    def execute(self, context):
+        props = context.scene.github_classroom
+        client = get_github_client()
+
+        if not client.is_authenticated():
+            props.error_message = "Please sign in first"
+            self.report({'ERROR'}, "Please sign in first")
+            return {'CANCELLED'}
+
+        url = props.repo_url.strip()
+        if not url:
+            props.error_message = "Please enter a repository URL"
+            self.report({'ERROR'}, "Please enter a repository URL")
+            return {'CANCELLED'}
+
+        owner, repo = client.parse_repo_url(url)
+        if not owner or not repo:
+            props.error_message = (
+                "Invalid repository URL. "
+                "Use the format: https://github.com/owner/repo"
+            )
+            self.report({'ERROR'}, "Invalid repository URL")
+            return {'CANCELLED'}
+
+        props.status_message = "Searching for .blend files..."
+        props.error_message = ""
+
+        # Find .blend files in the repository
+        success, blend_files, error = client.find_blend_files(owner, repo)
+        if not success:
+            props.error_message = error
+            self.report({'ERROR'}, error)
+            return {'CANCELLED'}
+
+        if not blend_files:
+            props.error_message = "No .blend file found in this repository"
+            self.report({'ERROR'}, "No .blend file found in this repository")
+            return {'CANCELLED'}
+
+        # Download the first .blend file
+        blend_file = blend_files[0]
+        file_path = blend_file.get('path', '')
+        file_name = blend_file.get('name', 'file.blend')
+
+        props.status_message = f"Downloading {file_name}..."
+
+        temp_dir = tempfile.gettempdir()
+        download_path = os.path.join(temp_dir, file_name)
+
+        success, error = client.download_file(
+            owner, repo, file_path, download_path
+        )
+
+        if success:
+            # Track working file for auto-push
+            client.set_working_file(owner, repo, file_path)
+
+            bpy.ops.wm.open_mainfile(filepath=download_path)
+            # Scene properties are now freed; only use local variables
+            self.report({'INFO'}, f"Opened {file_name} from {owner}/{repo}")
+        else:
+            props.error_message = error
+            self.report({'ERROR'}, error)
+
         return {'FINISHED'}
 
 
@@ -290,14 +411,32 @@ class GITHUB_OT_SelectRepo(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class GITHUB_OT_ToggleAssignment(bpy.types.Operator):
+    """Expand or collapse an assignment group in the teacher view"""
+    bl_idname = "github_class.toggle_assignment"
+    bl_label = "Toggle Assignment Group"
+
+    assignment_name: bpy.props.StringProperty()
+
+    def execute(self, context):
+        client = get_github_client()
+        if self.assignment_name in client.expanded_assignments:
+            client.expanded_assignments.discard(self.assignment_name)
+        else:
+            client.expanded_assignments.add(self.assignment_name)
+        return {'FINISHED'}
+
+
 # --- Save handler for auto-push ---
 
 @bpy.app.handlers.persistent
 def auto_push_on_save(dummy):
-    """Automatically push to GitHub after saving (if enabled)"""
+    """Automatically push to GitHub after saving (if auto-push on save)"""
     client = get_github_client()
 
-    if not client.is_authenticated() or not client.auto_push:
+    if not client.is_authenticated():
+        return
+    if client.auto_push_mode != AUTO_PUSH_ON_SAVE:
         return
 
     working = client.get_working_file()
@@ -328,5 +467,38 @@ def auto_push_on_save(dummy):
                 f"Auto-push failed: {error}. "
                 f"Try manual push or check your connection."
             )
+    except Exception:
+        pass
+
+
+# --- Quit handler for auto-push on quit ---
+
+@bpy.app.handlers.persistent
+def auto_push_on_quit(dummy):
+    """Push to GitHub before loading a new file (on-quit mode)"""
+    client = get_github_client()
+
+    if not client.is_authenticated():
+        return
+    if client.auto_push_mode != AUTO_PUSH_ON_QUIT:
+        return
+
+    working = client.get_working_file()
+    if not working:
+        return
+
+    try:
+        filepath = bpy.data.filepath
+        if not filepath:
+            return
+
+        file_name = os.path.basename(filepath)
+        client.upload_file(
+            working['repo_owner'],
+            working['repo_name'],
+            working['file_path'],
+            filepath,
+            message=f"Auto-save {file_name} from Blender (on quit)"
+        )
     except Exception:
         pass

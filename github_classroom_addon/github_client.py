@@ -14,6 +14,11 @@ from typing import Optional, List, Dict, Any, Tuple
 
 GITHUB_API_URL = "https://api.github.com"
 
+# Auto-push mode constants
+AUTO_PUSH_ON_SAVE = 'ON_SAVE'
+AUTO_PUSH_MANUAL = 'MANUAL'
+AUTO_PUSH_ON_QUIT = 'ON_QUIT'
+
 
 class GitHubClassroomClient:
     """Client for interacting with GitHub for classroom assignments"""
@@ -26,8 +31,12 @@ class GitHubClassroomClient:
         self.working_file_config = os.path.join(
             self.config_dir, 'working_file.json'
         )
+        self.settings_file = os.path.join(self.config_dir, 'settings.json')
         self.working_file = None
-        self.auto_push = True
+        self.advanced_mode = False
+        self.auto_push_mode = AUTO_PUSH_ON_SAVE
+        self.expanded_assignments = set()
+        self._load_settings()
         self._load_working_file()
 
     def _get_config_dir(self) -> str:
@@ -351,6 +360,35 @@ class GitHubClassroomClient:
         except Exception as e:
             return False, f"Error uploading file: {str(e)}"
 
+    # --- Settings management ---
+
+    def _load_settings(self):
+        """Load addon settings from config"""
+        if os.path.exists(self.settings_file):
+            try:
+                with open(self.settings_file, 'r') as f:
+                    data = json.load(f)
+                    self.advanced_mode = data.get('advanced_mode', False)
+                    self.auto_push_mode = data.get(
+                        'auto_push_mode', AUTO_PUSH_ON_SAVE
+                    )
+            except (json.JSONDecodeError, IOError):
+                pass
+
+    def _save_settings(self):
+        """Save addon settings to config"""
+        data = {
+            'advanced_mode': self.advanced_mode,
+            'auto_push_mode': self.auto_push_mode,
+        }
+        with open(self.settings_file, 'w') as f:
+            json.dump(data, f)
+
+    def set_auto_push_mode(self, mode: str):
+        """Set auto-push mode: ON_SAVE, MANUAL, or ON_QUIT"""
+        self.auto_push_mode = mode
+        self._save_settings()
+
     # --- Working file management (for auto-push on save) ---
 
     def set_working_file(self, repo_owner: str, repo_name: str,
@@ -373,17 +411,11 @@ class GitHubClassroomClient:
         if os.path.exists(self.working_file_config):
             os.remove(self.working_file_config)
 
-    def set_auto_push(self, enabled: bool):
-        """Enable or disable auto-push on save"""
-        self.auto_push = enabled
-        self._save_working_file()
-
     def _save_working_file(self):
         """Save working file info to config"""
         if self.working_file:
-            data = {**self.working_file, 'auto_push': self.auto_push}
             with open(self.working_file_config, 'w') as f:
-                json.dump(data, f)
+                json.dump(self.working_file, f)
 
     def _load_working_file(self):
         """Load working file info from config"""
@@ -391,10 +423,71 @@ class GitHubClassroomClient:
             try:
                 with open(self.working_file_config, 'r') as f:
                     data = json.load(f)
-                    self.auto_push = data.pop('auto_push', True)
-                    self.working_file = data
+                    # Backward compat: migrate auto_push bool to mode
+                    if 'auto_push' in data:
+                        old_val = data.pop('auto_push')
+                        if old_val:
+                            self.auto_push_mode = AUTO_PUSH_ON_SAVE
+                        else:
+                            self.auto_push_mode = AUTO_PUSH_MANUAL
+                        self._save_settings()
+                    self.working_file = data if data else None
             except (json.JSONDecodeError, IOError):
                 self.working_file = None
+
+    # --- URL parsing ---
+
+    @staticmethod
+    def parse_repo_url(url: str) -> Tuple[Optional[str], Optional[str]]:
+        """Parse a GitHub URL into (owner, repo). Returns (None, None) on failure."""
+        url = url.strip().rstrip('/')
+        if url.endswith('.git'):
+            url = url[:-4]
+        if url.startswith('https://'):
+            url = url[8:]
+        elif url.startswith('http://'):
+            url = url[7:]
+        if url.startswith('github.com/'):
+            url = url[11:]
+        parts = url.split('/')
+        if len(parts) >= 2 and parts[0] and parts[1]:
+            return parts[0], parts[1]
+        return None, None
+
+    # --- Assignment grouping (for teacher view) ---
+
+    @staticmethod
+    def compute_assignment_groups(
+        repo_names: List[str],
+    ) -> Dict[str, str]:
+        """
+        Compute assignment grouping for teacher view.
+        Uses the GitHub Classroom naming convention: {assignment}-{username}
+        Returns a dict mapping repo_name -> assignment_name.
+        Repos that don't match any group get an empty assignment_name.
+        """
+        # Count how many repos share each possible hyphen-delimited prefix
+        prefix_counts: Dict[str, int] = {}
+        for name in repo_names:
+            parts = name.split('-')
+            for i in range(1, len(parts)):
+                prefix = '-'.join(parts[:i])
+                prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
+
+        # For each repo, find the longest prefix shared with at least
+        # one other repo. That prefix is the assignment name.
+        result: Dict[str, str] = {}
+        for name in repo_names:
+            parts = name.split('-')
+            best_prefix = ''
+            for i in range(len(parts) - 1, 0, -1):
+                prefix = '-'.join(parts[:i])
+                if prefix_counts.get(prefix, 0) >= 2:
+                    best_prefix = prefix
+                    break
+            result[name] = best_prefix
+
+        return result
 
 
 # Global client instance

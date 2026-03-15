@@ -6,7 +6,7 @@ Connect to GitHub Classroom to manage Blender assignments
 bl_info = {
     "name": "GitHub Classroom",
     "author": "Educational Technology",
-    "version": (2, 0, 0),
+    "version": (3, 0, 0),
     "blender": (4, 5, 0),
     "location": "View3D > Sidebar > Classroom",
     "description": "Connect to GitHub Classroom to manage Blender assignments",
@@ -37,9 +37,12 @@ classes = (
     operators.GITHUB_OT_RefreshRepos,
     operators.GITHUB_OT_OpenFile,
     operators.GITHUB_OT_PushFile,
-    operators.GITHUB_OT_ToggleAutoPush,
+    operators.GITHUB_OT_SetAutoPushMode,
+    operators.GITHUB_OT_ToggleAdvancedMode,
+    operators.GITHUB_OT_PullFromURL,
     operators.GITHUB_OT_Disconnect,
     operators.GITHUB_OT_SelectRepo,
+    operators.GITHUB_OT_ToggleAssignment,
     # Panels
     ui.GITHUB_PT_MainPanel,
     ui.GITHUB_PT_ReposPanel,
@@ -54,15 +57,23 @@ def register():
         type=properties.GitHubClassroomProperties
     )
 
-    # Register save handler for auto-push
+    # Register save handler for auto-push on save
     if operators.auto_push_on_save not in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(operators.auto_push_on_save)
+
+    # Register load_pre handler for auto-push on quit
+    if operators.auto_push_on_quit not in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.append(operators.auto_push_on_quit)
 
 def unregister():
     """Unregister all classes, properties, and handlers"""
     # Remove save handler
     if operators.auto_push_on_save in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(operators.auto_push_on_save)
+
+    # Remove load_pre handler
+    if operators.auto_push_on_quit in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.remove(operators.auto_push_on_quit)
 
     del bpy.types.Scene.github_classroom
 
