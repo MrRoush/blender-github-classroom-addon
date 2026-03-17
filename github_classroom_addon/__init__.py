@@ -43,6 +43,7 @@ classes = (
     operators.GITHUB_OT_Disconnect,
     operators.GITHUB_OT_SelectRepo,
     operators.GITHUB_OT_ToggleAssignment,
+    operators.GITHUB_OT_RecoverAndPush,
     # Panels
     ui.GITHUB_PT_MainPanel,
     ui.GITHUB_PT_ReposPanel,
@@ -65,6 +66,10 @@ def register():
     if operators.auto_push_on_quit not in bpy.app.handlers.load_pre:
         bpy.app.handlers.load_pre.append(operators.auto_push_on_quit)
 
+    # Register load_post handler for crash recovery detection
+    if operators.check_crash_recovery not in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(operators.check_crash_recovery)
+
 def unregister():
     """Unregister all classes, properties, and handlers"""
     # Remove save handler
@@ -74,6 +79,10 @@ def unregister():
     # Remove load_pre handler
     if operators.auto_push_on_quit in bpy.app.handlers.load_pre:
         bpy.app.handlers.load_pre.remove(operators.auto_push_on_quit)
+
+    # Remove load_post handler for crash recovery detection
+    if operators.check_crash_recovery in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(operators.check_crash_recovery)
 
     del bpy.types.Scene.github_classroom
 
