@@ -111,3 +111,12 @@ class GitHubClassroomProperties(PropertyGroup):
         description="Current error message",
         default=""
     )
+
+    crash_recovery_detected: BoolProperty(
+        name="Crash Recovery Detected",
+        description=(
+            "True when Blender appears to have recovered from a crash "
+            "and the working file path is unset or in an autosave location"
+        ),
+        default=False
+    )

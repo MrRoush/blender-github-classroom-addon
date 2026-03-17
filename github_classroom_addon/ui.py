@@ -95,6 +95,26 @@ class GITHUB_PT_MainPanel(Panel):
                 text="Pull from URL", icon='IMPORT'
             )
 
+        # Crash recovery warning — shown above the normal push button area
+        # when an autosave / empty-filepath state is detected and the student
+        # has an active assignment.
+        if client.is_authenticated():
+            working = client.get_working_file()
+            if working and props.crash_recovery_detected:
+                box = layout.box()
+                box.alert = True
+                box.label(text="Crash Recovery Detected", icon='ERROR')
+                wrap_text(
+                    "Your GitHub connection is intact. "
+                    "Save your file to push your work.",
+                    box
+                )
+                box.operator(
+                    "github_class.recover_and_push",
+                    text="Save As & Push to GitHub",
+                    icon='FILE_TICK'
+                )
+
         # Working file status
         if client.is_authenticated():
             working = client.get_working_file()

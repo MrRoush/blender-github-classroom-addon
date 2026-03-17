@@ -427,6 +427,128 @@ class GITHUB_OT_ToggleAssignment(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class GITHUB_OT_RecoverAndPush(Operator):
+    """Save the recovered file to a new location and push to GitHub"""
+    bl_idname = "github_class.recover_and_push"
+    bl_label = "Save As & Push to GitHub"
+    bl_description = (
+        "Save your recovered file to a new location and push it "
+        "to your GitHub repository"
+    )
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(default="*.blend", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        if not self.filepath:
+            return {'CANCELLED'}
+
+        props = context.scene.github_classroom
+        client = get_github_client()
+
+        if not client.is_authenticated():
+            props.error_message = "Please sign in first"
+            self.report({'ERROR'}, "Please sign in first")
+            return {'CANCELLED'}
+
+        working = client.get_working_file()
+        if not working:
+            props.error_message = (
+                "No assignment file loaded. "
+                "Click \"Open Assignment\" first to connect "
+                "to your GitHub repository."
+            )
+            self.report({'ERROR'}, "No assignment file loaded")
+            return {'CANCELLED'}
+
+        # Save the file to the chosen path
+        bpy.ops.wm.save_as_mainfile(filepath=self.filepath)
+
+        props.status_message = "Pushing to GitHub..."
+        props.error_message = ""
+
+        file_name = os.path.basename(self.filepath)
+        message = props.commit_message.strip()
+        if not message:
+            message = f"Update {file_name} from Blender (crash recovery)"
+
+        success, error = client.upload_file(
+            working['repo_owner'],
+            working['repo_name'],
+            working['file_path'],
+            self.filepath,
+            message=message
+        )
+
+        if success:
+            props.status_message = "File saved and pushed to GitHub!"
+            props.crash_recovery_detected = False
+            props.commit_message = ""
+            self.report({'INFO'}, "File saved and pushed to GitHub!")
+        else:
+            props.error_message = error
+            self.report({'ERROR'}, error)
+
+        return {'FINISHED'}
+
+
+# --- Crash recovery helpers ---
+
+def is_crash_recovery_file():
+    """Return True if the current file looks like a crash/autosave recovery."""
+    filepath = bpy.data.filepath
+    if not filepath:
+        # Unsaved file — could be an in-memory recovery with no real path
+        return True
+
+    # Check against Blender's own autosave directory so we don't confuse it
+    # with files the addon downloads to tempfile.gettempdir().
+    try:
+        user_dir = bpy.utils.resource_path('USER')
+        autosave_dir = os.path.join(user_dir, 'cache', 'autosave')
+        norm_fp = os.path.normcase(os.path.normpath(filepath))
+        norm_as = os.path.normcase(os.path.normpath(autosave_dir))
+        if norm_fp.startswith(norm_as + os.sep):
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+@bpy.app.handlers.persistent
+def check_crash_recovery(dummy):
+    """Detect crash recovery state on file load and update panel properties."""
+    client = get_github_client()
+
+    # Only relevant when the student has an active assignment
+    working = client.get_working_file()
+    if not working:
+        # Clear any stale flag if there is no active assignment
+        try:
+            bpy.context.scene.github_classroom.crash_recovery_detected = False
+        except Exception:
+            pass
+        return
+
+    try:
+        props = bpy.context.scene.github_classroom
+        if is_crash_recovery_file():
+            props.crash_recovery_detected = True
+            props.status_message = (
+                "Crash recovery detected. "
+                "Your GitHub connection is intact."
+            )
+        else:
+            props.crash_recovery_detected = False
+    except Exception:
+        pass
+
+
 # --- Save handler for auto-push ---
 
 @bpy.app.handlers.persistent
