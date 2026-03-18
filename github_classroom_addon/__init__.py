@@ -44,6 +44,8 @@ classes = (
     operators.GITHUB_OT_SelectRepo,
     operators.GITHUB_OT_ToggleAssignment,
     operators.GITHUB_OT_RecoverAndPush,
+    operators.GITHUB_OT_UploadRender,
+    operators.GITHUB_OT_ToggleUploadRenders,
     # Panels
     ui.GITHUB_PT_MainPanel,
     ui.GITHUB_PT_ReposPanel,
@@ -70,6 +72,10 @@ def register():
     if operators.check_crash_recovery not in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(operators.check_crash_recovery)
 
+    # Register render_complete handler for auto-upload of renders
+    if operators.auto_upload_render not in bpy.app.handlers.render_complete:
+        bpy.app.handlers.render_complete.append(operators.auto_upload_render)
+
 def unregister():
     """Unregister all classes, properties, and handlers"""
     # Remove save handler
@@ -83,6 +89,10 @@ def unregister():
     # Remove load_post handler for crash recovery detection
     if operators.check_crash_recovery in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(operators.check_crash_recovery)
+
+    # Remove render_complete handler for auto-upload of renders
+    if operators.auto_upload_render in bpy.app.handlers.render_complete:
+        bpy.app.handlers.render_complete.remove(operators.auto_upload_render)
 
     del bpy.types.Scene.github_classroom
 

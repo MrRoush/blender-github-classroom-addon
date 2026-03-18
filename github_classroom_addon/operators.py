@@ -496,6 +496,116 @@ class GITHUB_OT_RecoverAndPush(Operator):
         return {'FINISHED'}
 
 
+class GITHUB_OT_UploadRender(Operator):
+    """Upload a rendered animation or image to GitHub"""
+    bl_idname = "github_class.upload_render"
+    bl_label = "Upload Render to GitHub"
+    bl_description = (
+        "Select a rendered animation or image file and upload it "
+        "to the 'renders/' folder in your GitHub repository"
+    )
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filter_glob: bpy.props.StringProperty(
+        default=(
+            "*.mp4;*.avi;*.mov;*.mkv;*.ogv;*.webm;*.mpg;*.mpeg"
+            ";*.flv;*.png;*.jpg;*.jpeg;*.exr;*.tiff;*.tif"
+        ),
+        options={'HIDDEN'}
+    )
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        if not self.filepath:
+            return {'CANCELLED'}
+
+        props = context.scene.github_classroom
+        client = get_github_client()
+
+        if not client.is_authenticated():
+            props.error_message = "Please sign in first"
+            self.report({'ERROR'}, "Please sign in first")
+            return {'CANCELLED'}
+
+        working = client.get_working_file()
+        if not working:
+            props.error_message = (
+                "No assignment file loaded. "
+                "Click \"Open Assignment\" first to connect "
+                "to your GitHub repository."
+            )
+            self.report({'ERROR'}, "No assignment file loaded")
+            return {'CANCELLED'}
+
+        if not os.path.isfile(self.filepath):
+            props.error_message = "Selected file does not exist"
+            self.report({'ERROR'}, "Selected file does not exist")
+            return {'CANCELLED'}
+
+        # GitHub API file size limit
+        file_size = os.path.getsize(self.filepath)
+        max_size = 100 * 1024 * 1024  # 100 MB
+        if file_size > max_size:
+            msg = (
+                f"File is too large to upload via the GitHub API "
+                f"({file_size // (1024 * 1024)} MB). "
+                f"The limit is 100 MB. Consider using Git LFS."
+            )
+            props.error_message = msg
+            self.report({'ERROR'}, msg)
+            return {'CANCELLED'}
+
+        file_name = os.path.basename(self.filepath)
+        repo_path = f"renders/{file_name}"
+
+        props.status_message = f"Uploading {file_name}..."
+        props.error_message = ""
+
+        message = props.commit_message.strip()
+        if not message:
+            message = f"Upload render {file_name} from Blender"
+
+        success, error = client.upload_file(
+            working['repo_owner'],
+            working['repo_name'],
+            repo_path,
+            self.filepath,
+            message=message
+        )
+
+        if success:
+            props.status_message = f"Render uploaded: {repo_path}"
+            props.commit_message = ""
+            self.report({'INFO'}, f"Render uploaded to {repo_path}")
+        else:
+            props.error_message = error
+            self.report({'ERROR'}, error)
+
+        return {'FINISHED'}
+
+
+class GITHUB_OT_ToggleUploadRenders(Operator):
+    """Toggle automatic render upload on render complete"""
+    bl_idname = "github_class.toggle_upload_renders"
+    bl_label = "Toggle Auto-Upload Renders"
+    bl_description = (
+        "Automatically upload video renders to the 'renders/' folder "
+        "in your GitHub repository when rendering completes"
+    )
+
+    def execute(self, context):
+        client = get_github_client()
+        client.set_upload_renders_on_complete(
+            not client.upload_renders_on_complete
+        )
+        state = "enabled" if client.upload_renders_on_complete else "disabled"
+        self.report({'INFO'}, f"Auto-upload renders {state}")
+        return {'FINISHED'}
+
+
 # --- Crash recovery helpers ---
 
 def is_crash_recovery_file():
@@ -622,5 +732,115 @@ def auto_push_on_quit(dummy):
             filepath,
             message=f"Auto-save {file_name} from Blender (on quit)"
         )
+    except Exception:
+        pass
+
+
+# --- Render complete handler for auto-upload ---
+
+# Video file formats that Blender writes as a single output file.
+_VIDEO_FORMATS = {'AVI_JPEG', 'AVI_RAW', 'FFMPEG'}
+
+# Mapping from Blender FFMPEG container enum to file extension.
+_FFMPEG_EXT = {
+    'MPEG1': '.mpg',
+    'MPEG2': '.mpg',
+    'MPEG4': '.mp4',
+    'AVI': '.avi',
+    'QUICKTIME': '.mov',
+    'DV': '.dv',
+    'OGG': '.ogv',
+    'MKV': '.mkv',
+    'FLASH': '.flv',
+    'WEBM': '.webm',
+}
+
+
+def _resolve_render_output_path(scene) -> str:
+    """
+    Return the absolute path of the rendered video file for *scene*.
+
+    Returns an empty string when the output format is not a single video
+    file (e.g. image sequences), so callers can skip the upload.
+    """
+    file_format = scene.render.image_settings.file_format
+    if file_format not in _VIDEO_FORMATS:
+        return ''
+
+    render_path = bpy.path.abspath(scene.render.filepath)
+
+    if file_format == 'FFMPEG':
+        container = scene.render.ffmpeg.format
+        ext = _FFMPEG_EXT.get(container)
+        if ext is None:
+            # Unknown container; Blender will append its own extension,
+            # so return the path as-is and let the upload handle it.
+            return render_path
+        # Blender appends the extension automatically; add it only when
+        # the path does not already end with the expected suffix.
+        if not render_path.lower().endswith(ext):
+            # Strip a trailing path separator if present before appending.
+            sep = os.sep
+            if render_path.endswith('/') or render_path.endswith(sep):
+                render_path = render_path[:-1]
+            render_path = render_path + ext
+
+    return render_path
+
+
+@bpy.app.handlers.persistent
+def auto_upload_render(scene, depsgraph):
+    """Upload the rendered video to GitHub when rendering completes."""
+    client = get_github_client()
+
+    if not client.is_authenticated():
+        return
+    if not client.upload_renders_on_complete:
+        return
+
+    working = client.get_working_file()
+    if not working:
+        return
+
+    render_path = _resolve_render_output_path(scene)
+    if not render_path:
+        return
+
+    if not os.path.isfile(render_path):
+        return
+
+    # GitHub API limit: 100 MB per file
+    file_size = os.path.getsize(render_path)
+    max_size = 100 * 1024 * 1024
+    if file_size > max_size:
+        try:
+            props = bpy.context.scene.github_classroom
+            props.error_message = (
+                f"Render too large to auto-upload "
+                f"({file_size // (1024 * 1024)} MB > 100 MB limit). "
+                f"Use 'Upload Render' to try manually or consider Git LFS."
+            )
+        except Exception:
+            pass
+        return
+
+    file_name = os.path.basename(render_path)
+    repo_path = f"renders/{file_name}"
+
+    success, error = client.upload_file(
+        working['repo_owner'],
+        working['repo_name'],
+        repo_path,
+        render_path,
+        message=f"Upload render {file_name} from Blender"
+    )
+
+    try:
+        props = bpy.context.scene.github_classroom
+        if success:
+            props.status_message = f"Render uploaded to GitHub: {repo_path}"
+            props.error_message = ""
+        else:
+            props.error_message = f"Render auto-upload failed: {error}"
     except Exception:
         pass

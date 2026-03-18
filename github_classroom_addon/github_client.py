@@ -35,6 +35,7 @@ class GitHubClassroomClient:
         self.working_file = None
         self.advanced_mode = False
         self.auto_push_mode = AUTO_PUSH_ON_SAVE
+        self.upload_renders_on_complete = False
         self.expanded_assignments = set()
         self._load_settings()
         self._load_working_file()
@@ -372,6 +373,9 @@ class GitHubClassroomClient:
                     self.auto_push_mode = data.get(
                         'auto_push_mode', AUTO_PUSH_ON_SAVE
                     )
+                    self.upload_renders_on_complete = data.get(
+                        'upload_renders_on_complete', False
+                    )
             except (json.JSONDecodeError, IOError):
                 pass
 
@@ -380,6 +384,7 @@ class GitHubClassroomClient:
         data = {
             'advanced_mode': self.advanced_mode,
             'auto_push_mode': self.auto_push_mode,
+            'upload_renders_on_complete': self.upload_renders_on_complete,
         }
         with open(self.settings_file, 'w') as f:
             json.dump(data, f)
@@ -387,6 +392,11 @@ class GitHubClassroomClient:
     def set_auto_push_mode(self, mode: str):
         """Set auto-push mode: ON_SAVE, MANUAL, or ON_QUIT"""
         self.auto_push_mode = mode
+        self._save_settings()
+
+    def set_upload_renders_on_complete(self, value: bool):
+        """Enable or disable automatic render upload on render complete"""
+        self.upload_renders_on_complete = value
         self._save_settings()
 
     # --- Working file management (for auto-push on save) ---

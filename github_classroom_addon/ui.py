@@ -146,6 +146,27 @@ class GITHUB_PT_MainPanel(Panel):
                 # Manual push button
                 box.operator("github_class.push_file", icon='EXPORT')
 
+                # Upload render (manual file picker)
+                box.operator(
+                    "github_class.upload_render",
+                    text="Upload Render to GitHub",
+                    icon='RENDER_ANIMATION'
+                )
+
+                # Auto-upload renders toggle (advanced mode only)
+                if advanced:
+                    icon = (
+                        'CHECKBOX_HLT'
+                        if client.upload_renders_on_complete
+                        else 'CHECKBOX_DEHLT'
+                    )
+                    box.operator(
+                        "github_class.toggle_upload_renders",
+                        text="Auto-Upload Renders on Complete",
+                        icon=icon,
+                        depress=client.upload_renders_on_complete
+                    )
+
                 # Disconnect
                 box.operator("github_class.disconnect", icon='X')
 
