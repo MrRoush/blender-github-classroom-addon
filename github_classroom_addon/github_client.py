@@ -7,6 +7,7 @@ Uses only Python standard library (no external dependencies required).
 import os
 import json
 import base64
+import ssl
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -54,6 +55,17 @@ class GitHubClassroomClient:
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
 
+    @staticmethod
+    def _get_ssl_context():
+        """Create an SSL context that works inside Blender's bundled Python."""
+        ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except (ImportError, OSError, ssl.SSLError):
+            pass  # Fall back to system defaults
+        return ctx
+
     def _make_request(self, endpoint: str, method: str = 'GET',
                       data: Optional[Dict] = None) -> Any:
         """Make an authenticated request to GitHub API"""
@@ -70,7 +82,7 @@ class GitHubClassroomClient:
         if data is not None:
             req.data = json.dumps(data).encode('utf-8')
 
-        response = urllib.request.urlopen(req)
+        response = urllib.request.urlopen(req, context=self._get_ssl_context())
         body = response.read().decode('utf-8')
         if body:
             return json.loads(body)
@@ -298,7 +310,7 @@ class GitHubClassroomClient:
             req.add_header('Authorization', f'token {self.token}')
             req.add_header('User-Agent', 'Blender-Classroom-Addon')
 
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, context=self._get_ssl_context()) as response:
                 with open(destination, 'wb') as f:
                     while True:
                         chunk = response.read(8192)
