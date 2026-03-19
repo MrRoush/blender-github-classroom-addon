@@ -52,6 +52,24 @@ Common issues and solutions for the GitHub Classroom Blender Add-on.
 3. Try signing out and back in
 4. Delete the token file (`github_classroom_addon/config/github_token.json`) and re-authenticate
 
+### Problem: SSL Certificate Verification Error (Blender 4.2+ on macOS or managed Windows)
+
+**Error message:**
+```
+Authentication failed: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1006)>
+```
+
+**Cause:**
+Blender bundles its own Python interpreter, which does not automatically use the system's SSL certificate store. On macOS and some managed school/lab Windows machines running Blender 4.2 or later, Python cannot verify GitHub's SSL certificate using the default settings.
+
+**Fix:**
+This error has been resolved in the add-on (v3.0.0 and later). The add-on now creates a proper SSL context using `ssl.create_default_context()` for all network requests. If you are seeing this error, make sure you are using the latest version of the add-on.
+
+If the error persists after updating, you can also install the `certifi` package into Blender's Python to provide a bundled certificate store:
+1. Find Blender's bundled Python executable (e.g., `<blender_install_dir>/python/bin/python3` on Linux/macOS, or `<blender_install_dir>\python\python.exe` on Windows)
+2. Run from a terminal: `"<path_to_blender_python>" -m pip install certifi`
+3. Restart Blender and try again
+
 ## Usage Issues
 
 ### Problem: No repositories found
