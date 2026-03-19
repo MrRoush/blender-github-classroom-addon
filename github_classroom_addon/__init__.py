@@ -7,7 +7,7 @@ bl_info = {
     "name": "GitHub Classroom",
     "author": "Educational Technology",
     "version": (3, 0, 0),
-    "blender": (4, 5, 0),
+    "blender": (4, 2, 0),
     "location": "View3D > Sidebar > Classroom",
     "description": "Connect to GitHub Classroom to manage Blender assignments",
     "category": "System",
