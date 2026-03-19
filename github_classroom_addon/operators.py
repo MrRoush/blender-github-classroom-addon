@@ -789,7 +789,7 @@ def _resolve_render_output_path(scene) -> str:
 
 
 @bpy.app.handlers.persistent
-def auto_upload_render(scene, depsgraph):
+def auto_upload_render(scene):
     """Upload the rendered video to GitHub when rendering completes."""
     client = get_github_client()
 
