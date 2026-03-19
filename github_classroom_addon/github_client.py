@@ -12,6 +12,11 @@ import urllib.request
 import urllib.error
 from typing import Optional, List, Dict, Any, Tuple
 
+try:
+    import bpy as _bpy
+except ImportError:
+    _bpy = None
+
 GITHUB_API_URL = "https://api.github.com"
 
 # Auto-push mode constants
@@ -41,9 +46,11 @@ class GitHubClassroomClient:
         self._load_working_file()
 
     def _get_config_dir(self) -> str:
-        """Get configuration directory for storing credentials"""
-        addon_dir = os.path.dirname(os.path.realpath(__file__))
-        config_dir = os.path.join(addon_dir, 'config')
+        """Get per-OS-user configuration directory for storing credentials"""
+        if _bpy is not None:
+            config_dir = os.path.join(_bpy.utils.resource_path('USER'), 'classroom_addon')
+        else:
+            config_dir = os.path.join(os.path.expanduser("~"), ".blender_classroom_addon")
         os.makedirs(config_dir, exist_ok=True)
         return config_dir
 

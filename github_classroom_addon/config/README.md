@@ -1,6 +1,19 @@
 # Configuration Directory
 
-This directory stores authentication and state files for the GitHub Classroom add-on.
+This directory is part of the add-on source and contains only documentation.
+
+Credential and state files are stored **per OS user account** so that students
+sharing the same computer cannot access each other's tokens or work.
+
+## Storage Location
+
+The actual config files are written to the current OS user's personal directory:
+
+- **When running inside Blender**: `<Blender user data>/classroom_addon/`
+  - Windows: `%APPDATA%\Blender Foundation\Blender\<version>\classroom_addon\`
+  - Linux: `~/.config/blender/<version>/classroom_addon/`
+  - macOS: `~/Library/Application Support/Blender/<version>/classroom_addon/`
+- **Fallback (e.g., unit tests)**: `~/.blender_classroom_addon/`
 
 ## Files
 
@@ -8,11 +21,16 @@ This directory stores authentication and state files for the GitHub Classroom ad
 - Created automatically when you sign in with your GitHub Personal Access Token
 - Contains your saved token so you don't need to sign in every time
 - **Do not share this file** — it contains your authentication credentials
+- To remove it, click **Sign Out** in the add-on, or delete the file manually
 
 ### `working_file.json`
 - Created automatically when you open a .blend file from a repository
 - Tracks which repository and file you're working on for auto-push
 - Safe to delete if you want to disconnect from a repository
+
+### `settings.json`
+- Stores add-on preferences (advanced mode, auto-push mode, etc.)
+- Safe to delete; defaults will be restored on next launch
 
 ## Getting a GitHub Personal Access Token
 
@@ -26,6 +44,7 @@ This directory stores authentication and state files for the GitHub Classroom ad
 
 ## Security
 
-- Token and working file data are stored locally on your computer
-- These files are listed in `.gitignore` and will not be uploaded to GitHub
+- Each OS user account has its own separate token file in their home directory
+- When a student logs out of the computer, the next student who logs in will **not** be auto-authenticated as the previous student
+- Token and working file data are listed in `.gitignore` and will not be uploaded to GitHub
 - If you suspect your token has been compromised, revoke it on GitHub and generate a new one
